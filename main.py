@@ -6,7 +6,11 @@ from wyze_sdk.errors import WyzeApiError
 
 class WyzeController:
     def __init__(self, user, password, bulb_list):
-        self.client = Client(email=user, password=password)
+        try:
+            self.client = Client(email=user, password=password)
+        except Exception as e:
+            sys.exit(f"Client cannot connect to API: {e}")
+
         self.bulbs = self.client.bulbs.list()
         self.bulb_list = bulb_list
         self.bulb_list_matches = [bulb for bulb in self.bulbs if bulb.nickname in bulb_list]
@@ -37,14 +41,11 @@ class WyzeController:
             threads.append(x)
             x.start()
 
-    def power_off_office_lights(self):
+    def power_off_bulbs(self, targets):
         threads = list()
 
-        for index in range(len(self.bulb_list_matches)):
-            device_mac = self.bulb_list_matches[index].mac
-            device_model = self.bulb_list_matches[index].product.model
-
-            x = threading.Thread(target=self.power_off_bulb, args=(device_mac,device_model))
+        for bulb in targets:
+            x = threading.Thread(target=self.power_off_bulb, args=(bulb.mac, bulb.product.model))
             threads.append(x)
             x.start()
 
@@ -75,11 +76,14 @@ class WyzeController:
         self.set_bulbs_color_brightness(self.bulb_list_matches, color, 100)
         self.power_on_bulbs(self.bulb_list_matches)
 
+    def off_mode(self):
+        self.power_off_bulbs(self.bulb_list_matches)
+
 
 mycontroller = WyzeController(user=sys.argv[2], password=sys.argv[3], bulb_list=['Lamp', 'Ceiling 1', 'Ceiling 2', 'Ceiling 3'])
 
 if sys.argv[1] == "off":
-    mycontroller.power_off_office_lights()
+    mycontroller.off_mode()
 
 elif sys.argv[1] == "stream":
     mycontroller.stream_mode()
