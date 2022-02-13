@@ -1,4 +1,5 @@
 import sys
+import threading
 from wyze_sdk import Client
 from wyze_sdk.errors import WyzeApiError
 
@@ -8,41 +9,74 @@ class WyzeController:
         self.client = Client(email=user, password=password)
         self.bulbs = self.client.bulbs.list()
         self.bulb_list = bulb_list
+        self.bulb_list_matches = [bulb for bulb in self.bulbs if bulb.nickname in bulb_list]
+
+    def power_off_bulb(self, device_mac, device_model):
+        self.client.bulbs.turn_off(device_mac=device_mac,device_model=device_model)
+
+    def power_on_bulb(self, device_mac, device_model):
+        self.client.bulbs.turn_on(device_mac=device_mac, device_model=device_model)
+
+    def set_color_brightness(self, device_mac, device_model, color: str, brightness: int):
+        self.client.bulbs.set_brightness(device_mac=device_mac, device_model=device_model, brightness=brightness)
+        self.client.bulbs.set_color(device_mac=device_mac, device_model=device_model, color=color)
+
+    def set_bulbs_color_brightness(self, targets, color:str, brightness:int):
+        threads = list()
+
+        for bulb in targets:
+            x = threading.Thread(target=self.set_color_brightness, args=(bulb.mac, bulb.product.model, color, brightness))
+            threads.append(x)
+            x.start()
+
+    def power_on_bulbs(self, targets):
+        threads = list()
+
+        for bulb in targets:
+            x = threading.Thread(target=self.power_on_bulb, args=(bulb.mac, bulb.product.model))
+            threads.append(x)
+            x.start()
 
     def power_off_office_lights(self):
+        threads = list()
+
+        for index in range(len(self.bulb_list_matches)):
+            device_mac = self.bulb_list_matches[index].mac
+            device_model = self.bulb_list_matches[index].product.model
+
+            x = threading.Thread(target=self.power_off_bulb, args=(device_mac,device_model))
+            threads.append(x)
+            x.start()
+
+    def get_bulbs(self, bulb_list):
+        bulbs = list()
         for bulb in self.bulbs:
-            if bulb.nickname in self.bulb_list:
-                self.client.bulbs.turn_off(device_mac=bulb.mac, device_model=bulb.product.model)
+            if bulb.nickname in bulb_list:
+                bulbs.append(bulb)
+
+        return bulbs
 
     def stream_mode(self):
         ceiling_fan = ['Ceiling 1', 'Ceiling 2']
+        ceiling_fan_bulbs = self.get_bulbs(ceiling_fan)
+
         lamp = ['Lamp']
+        lamp_bulbs = self.get_bulbs(lamp)
 
         pink_color = 'be008e'
         blue_color = '035ffe'
 
-        for bulb in self.bulbs:
-            if bulb.nickname in ceiling_fan:
-                self.client.bulbs.set_color(device_mac=bulb.mac, device_model=bulb.product.model, color=pink_color)
-                self.client.bulbs.set_brightness(device_mac=bulb.mac, device_model=bulb.product.model, brightness=100)
-                self.client.bulbs.turn_on(device_mac=bulb.mac, device_model=bulb.product.model)
-            elif bulb.nickname in lamp:
-                self.client.bulbs.set_color(device_mac=bulb.mac, device_model=bulb.product.model, color=blue_color)
-                self.client.bulbs.set_brightness(device_mac=bulb.mac, device_model=bulb.product.model, brightness=100)
-                self.client.bulbs.turn_on(device_mac=bulb.mac, device_model=bulb.product.model)
+        self.set_bulbs_color_brightness(ceiling_fan_bulbs, pink_color, 100)
+        self.set_bulbs_color_brightness(lamp_bulbs, blue_color, 100)
+        self.power_on_bulbs(ceiling_fan_bulbs + lamp_bulbs)
 
     def normal_mode(self):
-        lighting_group = ['Ceiling 1', 'Ceiling 2', 'Lamp']
         color = 'FBFAF5'
-
-        for bulb in self.bulbs:
-            if bulb.nickname in lighting_group:
-                self.client.bulbs.set_color(device_mac=bulb.mac, device_model=bulb.product.model, color=color)
-                self.client.bulbs.set_brightness(device_mac=bulb.mac, device_model=bulb.product.model, brightness=100)
-                self.client.bulbs.turn_on(device_mac=bulb.mac, device_model=bulb.product.model)
+        self.set_bulbs_color_brightness(self.bulb_list_matches, color, 100)
+        self.power_on_bulbs(self.bulb_list_matches)
 
 
-mycontroller = WyzeController(user=sys.argv[2], password=sys.argv[3], bulb_list=['Lamp', 'Ceiling 1', 'Ceiling 2'])
+mycontroller = WyzeController(user=sys.argv[2], password=sys.argv[3], bulb_list=['Lamp', 'Ceiling 1', 'Ceiling 2', 'Ceiling 3'])
 
 if sys.argv[1] == "off":
     mycontroller.power_off_office_lights()
