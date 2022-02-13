@@ -1,6 +1,8 @@
 import sys
 import threading
+import os
 from wyze_sdk import Client
+from decouple import Config, RepositoryEnv
 from wyze_sdk.errors import WyzeApiError
 
 
@@ -16,7 +18,7 @@ class WyzeController:
         self.bulb_list_matches = [bulb for bulb in self.bulbs if bulb.nickname in bulb_list]
 
     def power_off_bulb(self, device_mac, device_model):
-        self.client.bulbs.turn_off(device_mac=device_mac,device_model=device_model)
+        self.client.bulbs.turn_off(device_mac=device_mac, device_model=device_model)
 
     def power_on_bulb(self, device_mac, device_model):
         self.client.bulbs.turn_on(device_mac=device_mac, device_model=device_model)
@@ -25,7 +27,7 @@ class WyzeController:
         self.client.bulbs.set_brightness(device_mac=device_mac, device_model=device_model, brightness=brightness)
         self.client.bulbs.set_color(device_mac=device_mac, device_model=device_model, color=color)
 
-    def set_bulbs_color_brightness(self, targets, color:str, brightness:int):
+    def set_bulbs_color_brightness(self, targets, color: str, brightness: int):
         threads = list()
 
         for bulb in targets:
@@ -80,7 +82,13 @@ class WyzeController:
         self.power_off_bulbs(self.bulb_list_matches)
 
 
-mycontroller = WyzeController(user=sys.argv[2], password=sys.argv[3], bulb_list=['Lamp', 'Ceiling 1', 'Ceiling 2', 'Ceiling 3'])
+SCRIPT_PATH = os.path.dirname(os.path.abspath(__file__))
+ENV_FILE = os.path.dirname(os.path.abspath(__file__)) + "\\.env"
+env_config = Config(RepositoryEnv(ENV_FILE))
+
+mycontroller = WyzeController(user=env_config.get('user'),
+                              password=env_config.get('password'),
+                              bulb_list=['Lamp', 'Ceiling 1', 'Ceiling 2', 'Ceiling 3'])
 
 if sys.argv[1] == "off":
     mycontroller.off_mode()
