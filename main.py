@@ -83,8 +83,8 @@ class WyzeController:
 
 
 SCRIPT_PATH = os.path.dirname(os.path.abspath(__file__))
-ENV_FILE = os.path.dirname(os.path.abspath(__file__)) + "\\.env"
-env_config = Config(RepositoryEnv(ENV_FILE))
+ENV_FILE = '.env'
+env_config = Config(RepositoryEnv(os.path.join(SCRIPT_PATH,ENV_FILE)))
 
 mycontroller = WyzeController(user=env_config.get('user'),
                               password=env_config.get('password'),
